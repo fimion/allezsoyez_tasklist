@@ -30,8 +30,6 @@ function show_items($db,$listid){
     if ($statement->execute(array($listid))) {
         $theseitems = $statement->fetchAll();
 
-        // part of navbar
-        echo " | <a href=\"./?mode=additem&listid=$listid\">Add To This List</a>";
 
         // get list name
         $statement = $db->prepare("select listname from lists where id = ?");
@@ -134,23 +132,26 @@ echo $navbar;
     //***** check for our lists
 switch($mode){
     case "viewlist":
+        // part of navbar
+        echo " | <a href=\"./?mode=additem&listid=$listid\">Add To This List</a>";
         show_items($db,$listid);
         break;
 
     case "addlist":
-        show_lists($theselists);
-        echo "
-            <form method=\"post\">
-            <input type=\"text\" name=\"addlist\">
-            <input type=\"submit\" value=\"Add List\">
-            </form>
-        ";
+
+
 
         @$newlist = htmlspecialchars($_POST['addlist']);
 
         //attempt to insert, but only if you actually tried to do so
         if (!$newlist) {
-            echo "";
+            echo "
+                <br><form method=\"post\">
+                <input type=\"text\" name=\"addlist\">
+                <input type=\"submit\" value=\"Add List\">
+                </form>
+            ";
+            show_lists($theselists);
         }
         else {
             // prepare statement then run it
@@ -160,41 +161,43 @@ switch($mode){
                 err($db);
             }
             else {
-                echo "New list added: \"".$newlist."\"";
+                echo "<br>New list added: \"".$newlist."\"<br><br>";
+                show_lists($theselists);
             }
         }
         break;
 
     case "editlist":
-        show_lists($theselists);
         $statement = $db->prepare("select listname from lists where id=?");
         $statement->execute(array($listid));
 
         if ($listid && $thislist = $statement->fetch()) {
-            echo "Currently editing list name: \"$thislist[0]\"";
 
-            // text box to change name
-            echo "
-                <form method=\"post\">
-                    <input type=\"text\" name=\"editlist\">
-                    <input type=\"submit\" value=\"Save Change\">
-                </form>
-            ";
 
             // if the value is not blank, commit changes. well, try to, anyway
             @$newedit = SQLite3::escapeString(htmlspecialchars($_POST['editlist']));
 
             if (!$newedit) {
-                echo "";
+                echo "<br>Currently editing list name: \"$thislist[0]\"";
+
+                // text box to change name
+                echo "
+                    <br><form method=\"post\">
+                        <input type=\"text\" name=\"editlist\">
+                        <input type=\"submit\" value=\"Save Change\">
+                    </form>
+                ";
+                show_lists($theselists);
             }
             else {
                 $statement = $db->prepare("update lists set listname = ? where id = ?");
                 if ( !$statement->execute(array($newedit,$listid)) ) {
-                    echo "Something went wrong while changing that:</br>";
+                    echo "<br>Something went wrong while changing that:</br>";
                     err($db);
                 }
                 else {
-                    echo "List \"$thislist[0]\" renamed to \"$newedit\"";
+                    echo "<br><br>List \"$thislist[0]\" renamed to \"$newedit\"<br><br>";
+                    show_lists($theselists);
                 }
             }
         }
@@ -205,7 +208,6 @@ switch($mode){
         break;
 
     case "deletelist":
-        show_lists($theselists);
         // these are the items
         $statement = $db->prepare("select item from items where whichlist=?");
         $statement->execute(array($listid));
@@ -252,26 +254,28 @@ switch($mode){
             echo "</br></br>Something went wrong while fetching data:</br>";
             err($db);
         }
+        show_lists($theselists);
         break;
 
     case "additem":
-        show_items($db,$listid);
-        // here let's have a text box for the new list item, then
-        // a submit button that will append it to the list
 
-        echo "
-            <form method=\"post\">
-                <input type=\"text\" name=\"addtask\">
-                <input type=\"submit\" value=\"Add Task\">
-            </form>
-        ";
+
 
         @$newtask = htmlspecialchars($_POST['addtask']);
         // the default value for tasks being complete is 0
 
         //attempt to insert, but only if you actually tried to do so
         if (!$newtask) {
-            echo "";
+            // here let's have a text box for the new list item, then
+            // a submit button that will append it to the list
+
+            echo "
+                <br><form method=\"post\">
+                    <input type=\"text\" name=\"addtask\">
+                    <input type=\"submit\" value=\"Add Task\">
+                </form>
+            ";
+            show_items($db,$listid);
         }
         else {
             // prepare statement then run it
@@ -281,32 +285,35 @@ switch($mode){
                 err($db);
             }
             else {
-                echo "New task added: \"".$newtask."\"";
+                echo "<br>New task added: \"".$newtask."\"";
+                show_items($db,$listid);
             }
         }
         break;
 
     case "edititem":
-        show_items($db,$listid);
-        $statement = $db->prepare("select item from items where id=?");
+        // part of navbar
+        echo " | <a href=\"./?mode=additem&listid=$listid\">Add To This List</a>";
+        $statement = $db->prepare("select item, whichlist from items where id=?");
         $statement->execute(array($itemid));
 
         if ($itemid && $thisitem = $statement->fetch()) {
-            echo "</br></br>Currently editing task: \"$thisitem[0]\"";
 
-            // text box to insert new item
-            echo "
-                <form method=\"post\">
-                    <input type=\"text\" name=\"edittask\">
-                    <input type=\"submit\" value=\"Save Change\">
-                </form>
-            ";
 
             // if the value is not blank, commit changes. well, try to, anyway
             @$newedit = htmlspecialchars($_POST['edittask']);
 
             if (!$newedit) {
-                echo "";
+                echo "<br></br></br>Currently editing task: \"$thisitem[0]\"";
+
+                // text box to insert new item
+                echo "
+                    <form method=\"post\">
+                        <input type=\"text\" name=\"edittask\">
+                        <input type=\"submit\" value=\"Save Change\">
+                    </form>
+                ";
+                show_items($db,$thisitem['whichlist']);
             }
             else {
                 $statement = $db->prepare("update items set item = ?, complete = ? where id = ?");
@@ -316,6 +323,7 @@ switch($mode){
                 }
                 else {
                     echo "Task \"$thisitem[0]\" successfully changed to \"$newedit\"";
+                    show_items($db,$thisitem['whichlist']);
                 }
             }
         }
@@ -326,11 +334,11 @@ switch($mode){
         break;
 
     case "deleteitem":
-        show_items($db,$listid);
-        $statement = $db->prepare("select item from items where id=?");
+        $statement = $db->prepare("select item, whichlist from items where id=?");
         $statement->execute(array($itemid));
 
         if ($itemid && $thisitem = $statement->fetch()) {
+            show_items($db,$thisitem['whichlist']);
             echo "</br></br>Are you sure you wish to delete task \"$thisitem[0]\"?";
 
             echo "
@@ -356,8 +364,7 @@ switch($mode){
         }
         break;
     case "checkitem":
-        show_items($db,$listid);
-        $statement = $db->prepare("select item, complete from items where id=?");
+        $statement = $db->prepare("select item, complete, whichlist from items where id=?");
         $statement->execute(array($itemid));
 
         if ($itemid && $thisitem = $statement->fetch()) {
@@ -380,6 +387,7 @@ switch($mode){
 
             if ( $statement->execute(array($ischecked,$itemid)) ) {
                 echo "</br></br>Task \"$thisitem[0]\" marked as $text";
+                show_items($db,$thisitem['whichlist']);
             }
             else {
                 echo "</br></br>Something went wrong while updating data:</br>";
